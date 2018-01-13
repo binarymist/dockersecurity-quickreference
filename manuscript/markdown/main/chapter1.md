@@ -1,4 +1,4 @@
-# Habitat
+# 1. Habitat
 
 With the continual push for shorter development cycles, combined with continuous delivery, as well as cloud and virtual based infrastructure, containers have become an important part of the continuous delivery pipeline. Docker has established itself as a top contender in this space.
 
