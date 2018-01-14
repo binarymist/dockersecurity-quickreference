@@ -805,3 +805,26 @@ There have been a few revisions since 2005, such as the addition of "seccomp fil
 Docker has [disabled about 44 system calls](https://docs.docker.com/engine/security/seccomp/) in its default (seccomp) container profile ([default.json](https://github.com/docker/docker/blob/master/profiles/seccomp/default.json)) out of well over 300 available in the Linux kernel. Docker calls this "_moderately protective while providing wide application compatibility_". It appears that ease of use is the first priority. Again, plenty of opportunity here for reducing the attack surface on the kernel APIs. For example, the `keyctl` System call was removed from the default Docker container profile after vulnerability [CVE-2016-0728](https://cve.mitre.org/cgi-bin/cvename.cgi?name=cve-2016-0728) was discovered, which allows privilege escalation or denial of service. [CVE-2014-3153](https://cve.mitre.org/cgi-bin/cvename.cgi?name=cve-2014-3153) is another vulnerability accessible from the `futex` System call which is white listed in the default Docker profile.
 
 If you are looking to attack the Linux kernel via its APIs from a Docker container, you still have plenty of surface area here to play with.
+
+## Seccomp (Countermeasures) {#docker-hardening-docker-host-engine-and-containers-seccomp-countermeasures}
+
+First, you need to make sure your Docker instance was built with Seccomp. Using the recommended command from the CIS Docker Benchmark:
+
+{linenos=off, lang=Bash}
+    docker ps --quiet | xargs docker inspect --format '{{ .Id }}: SecurityOpt={{ .HostConfig.SecurityOpt }}'
+    # Should return without a value, or your modified seccomp profile, discussed soon.
+    # If [seccomp:unconfined] is returned, it means the container is running with
+    # no restrictions on System calls.
+    # Which means the container is running without any seccomp profile.
+
+Confirm that your kernel is [configured with `CONFIG_SECCOMP`](https://docs.docker.com/engine/security/seccomp/):
+
+{linenos=off, lang=Bash}
+    cat /boot/config-`uname -r` | grep CONFIG_SECCOMP=
+    # Should return the following if it is:
+    CONFIG_SECCOMP=y
+
+To add system calls to the list of syscalls you want to block for your container, take a copy of the default seccomp profile for containers ([`default.json`](https://github.com/docker/docker/blob/master/profiles/seccomp/default.json)) which contains a whitelist of the allowed system calls, and remove the system calls you want blocked. Then, run your container with the `--security-opt` option to override the default profile with a copy that you have modified: 
+
+{linenos=off, lang=Bash}
+    docker run --rm -it --security-opt seccomp=/path/to/seccomp/profile.json hello-world
