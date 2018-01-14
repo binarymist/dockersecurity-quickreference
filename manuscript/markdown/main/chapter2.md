@@ -482,3 +482,197 @@ When a container is started with `docker run` without specifying a cgroup parent
 If an attacker gains access to a container, or, in a multi-tenanted scenario where being able to run a container by an arbitrary entity is expected, by default, there is nothing stopping a fork bomb  
 `:(){:|:&};:`  
 launched in a container from bringing the host system down. This is because, by default, there is no limit to the number of processes a container can run.
+
+## [Control Groups](http://man7.org/linux/man-pages/man7/cgroups.7.html) (Countermeasures) {#hardening-docker-host-engine-and-containers-control-groups-countermeasures}
+
+Use cgroups to limit, track and monitor the resources available to each container at each nested level. Docker makes applying resource constraints very easy. Check the [runtime constraints on resources](https://docs.docker.com/engine/reference/run/#runtime-constraints-on-resources) Docker engine run reference documentation, which covers applying constraints such as:
+
+* User memory
+* Kernel memory
+* Swappiness
+* CPU share
+* CPU period
+* Cpuset
+* CPU quota
+* Block IO bandwidth (Blkio)
+
+For additional details on setting these types of resource limits, also refer to the [Limit a container's resources](https://docs.docker.com/engine/admin/resource_constraints/) Admin Guide for Docker Engine. Basically, when you `run` a container, you simply provide any number of the runtime configuration flags that control the underlying cgroup system resources. Cgroup resources cannot be set if a process is not running, that is why we optionally pass the flag(s) at runtime or alternatively, manually change the cgroup settings once a process (or Docker container in our case) is running. We can make manual changes on the fly by directly modifying the cgroup resource files. These files are stored in the container's cgroup directories shown in the output of the [`/sys/fs/cgroup   find -name "4f1f200ce13f2a7a180730f964c6c56d25218d6dd40b027c7b5ee1e551f4eb24"`](#hardening-docker-host-engine-and-containers-control-groups-sys-fs-cgroup) command below. These files are ephemeral for the life of the process (Docker container in our case).
+
+By [default](https://docs.docker.com/engine/reference/commandline/dockerd/#options-for-the-runtime) Docker uses the cgroupfs cgroup driver to interface with the Linux kernel's cgroups. You can see this by running `docker info`. The Linux kernel's cgroup interface is provided through the cgroupfs pseudo-filesystem `/sys/fs/cgroup` on the host filesystem of recent Linux distributions. The `/proc/cgroups` file contains the information about the systems controllers compiled into the kernel. This file on my test system looks like the following:
+
+{linenos=off, lang=bash}
+    #subsys_name    hierarchy       num_cgroups     enabled
+    cpuset          4               9               1
+    cpu             5               106             1
+    cpuacct         5               106             1
+    blkio           11              105             1
+    memory          6               170             1
+    devices         8               105             1
+    freezer         3               9               1
+    net_cls         7               9               1
+    perf_event      2               9               1
+    net_prio        7               9               1
+    hugetlb         9               9               1
+    pids            10              110             1
+
+The fields represent the following:
+
+* `subsys_name`: The name of the controller
+* `hierarchy`: Unique Id of the cgroup hierarchy
+* `num_cgroups`: The number of cgroups in the specific hierarchy using this controller
+* `enabled`: 1 == enabled, 0 == disabled 
+
+If you run a container as follows:
+
+{linenos=off, lang=bash}
+    docker run -it --rm --name=cgroup-test ubuntu
+    root@4f1f200ce13f:/# 
+
+Cgroups for your containers and the system resources controlled by them will be stored as follows:
+
+{id="hardening-docker-host-engine-and-containers-control-groups-sys-fs-cgroup", title="/sys/fs/cgroup pseudo-filesystem", linenos=off, lang=bash}
+    /sys/fs/cgroup   find -name "4f1f200ce13f2a7a180730f964c6c56d25218d6dd40b027c7b5ee1e551f4eb24"
+    ./blkio/docker/4f1f200ce13f2a7a180730f964c6c56d25218d6dd40b027c7b5ee1e551f4eb24
+    ./pids/docker/4f1f200ce13f2a7a180730f964c6c56d25218d6dd40b027c7b5ee1e551f4eb24
+    ./hugetlb/docker/4f1f200ce13f2a7a180730f964c6c56d25218d6dd40b027c7b5ee1e551f4eb24
+    ./devices/docker/4f1f200ce13f2a7a180730f964c6c56d25218d6dd40b027c7b5ee1e551f4eb24
+    ./net_cls,net_prio/docker/4f1f200ce13f2a7a180730f964c6c56d25218d6dd40b027c7b5ee1e551f4eb24
+    ./memory/docker/4f1f200ce13f2a7a180730f964c6c56d25218d6dd40b027c7b5ee1e551f4eb24
+    ./cpu,cpuacct/docker/4f1f200ce13f2a7a180730f964c6c56d25218d6dd40b027c7b5ee1e551f4eb24
+    ./cpuset/docker/4f1f200ce13f2a7a180730f964c6c56d25218d6dd40b027c7b5ee1e551f4eb24
+    ./freezer/docker/4f1f200ce13f2a7a180730f964c6c56d25218d6dd40b027c7b5ee1e551f4eb24
+    ./perf_event/docker/4f1f200ce13f2a7a180730f964c6c56d25218d6dd40b027c7b5ee1e551f4eb24
+    ./systemd/docker/4f1f200ce13f2a7a180730f964c6c56d25218d6dd40b027c7b5ee1e551f4eb24/sys/fs/cgroup` pseudo-filesystem
+
+Docker also keeps track of the cgroups in  
+`/sys/fs/cgroup/[resource]/docker/[containerId]`  
+You will notice that Docker creates cgroups using the container Id.
+
+If you want to manually create a cgroup, and have your containers hierarchically nested within it, you just need to `mkdir` within:  
+`/sys/fs/cgroup/`  
+You will likely need to be root for this.
+
+{linenos=off, lang=bash}
+    /sys/fs/cgroup mkdir cg1
+
+This makes and populates the directory, and also sets up the cgroup like the following:
+
+{linenos=off, lang=bash}
+    /sys/fs/cgroup   find -name "cg1"
+    ./cg1
+    ./blkio/system.slice/docker.service/cg1
+    ./pids/system.slice/docker.service/cg1
+    ./hugetlb/cg1
+    ./devices/system.slice/docker.service/cg1
+    ./net_cls,net_prio/cg1
+    ./memory/system.slice/docker.service/cg1
+    ./cpu,cpuacct/system.slice/docker.service/cg1
+    ./cpuset/cg1
+    ./freezer/
+    ./perf_event/cg1
+    ./systemd/system.slice/docker.service/cg1
+
+Now you can run a container with `cg1` as your cgroup parent:
+
+{linenos=off, lang=bash}
+    docker run -it --rm --cgroup-parent=cg1 --name=cgroup-test1 ubuntu
+    root@810095d51702:/#
+
+Now that Docker has your container named `cgroup-test1` running, you will be able to see the nested cgroups:
+
+{linenos=off, lang=bash}
+    /sys/fs/cgroup   find -name "810095d51702*"
+    ./blkio/system.slice/docker.service/cg1/810095d517027737a0ba4619e108903c5cc74517907b883306b90961ee528903
+    ./pids/system.slice/docker.service/cg1/810095d517027737a0ba4619e108903c5cc74517907b883306b90961ee528903
+    ./hugetlb/cg1/810095d517027737a0ba4619e108903c5cc74517907b883306b90961ee528903
+    ./devices/system.slice/docker.service/cg1/810095d517027737a0ba4619e108903c5cc74517907b883306b90961ee528903
+    ./net_cls,net_prio/cg1/810095d517027737a0ba4619e108903c5cc74517907b883306b90961ee528903
+    ./memory/system.slice/docker.service/cg1/810095d517027737a0ba4619e108903c5cc74517907b883306b90961ee528903
+    ./cpu,cpuacct/system.slice/docker.service/cg1/810095d517027737a0ba4619e108903c5cc74517907b883306b90961ee528903
+    ./cpuset/cg1/810095d517027737a0ba4619e108903c5cc74517907b883306b90961ee528903
+    ./freezer/cg1/810095d517027737a0ba4619e108903c5cc74517907b883306b90961ee528903
+    ./perf_event/cg1/810095d517027737a0ba4619e108903c5cc74517907b883306b90961ee528903
+    ./systemd/system.slice/docker.service/cg1/810095d517027737a0ba4619e108903c5cc74517907b883306b90961ee528903
+
+You can also run containers nested below already running containers cgroups, let's take the container named `cgroup-test` for example:
+
+{linenos=off, lang=bash}
+    /sys/fs/cgroup/cpu/docker/4f1f200ce13f2a7a180730f964c6c56d25218d6dd40b027c7b5ee1e551f4eb24
+
+{linenos=off, lang=bash}
+    docker run -it --rm --cgroup-parent=4f1f200ce13f2a7a180730f964c6c56d25218d6dd40b027c7b5ee1e551f4eb24 --name=cgroup-test2 ubuntu
+    root@93cb84d30291:/#
+
+Now your new container named `cgroup-test2` will have a set of nested cgroups within each of the:  
+`93cb84d30291201a84d5676545015220696dbcc72a65a12a0c96cda01dd1d270`  
+directories shown here:
+
+{linenos=off, lang=bash}
+    /sys/fs/cgroup   find -name "93cb84d30291*"
+    ./blkio/system.slice/docker.service/4f1f200ce13f2a7a180730f964c6c56d25218d6dd40b027c7b5ee1e551f4eb24/93cb84d30291201a84d5676545015220696dbcc72a65a12a0c96cda01dd1d270
+    ./pids/system.slice/docker.service/4f1f200ce13f2a7a180730f964c6c56d25218d6dd40b027c7b5ee1e551f4eb24/93cb84d30291201a84d5676545015220696dbcc72a65a12a0c96cda01dd1d270
+    ./hugetlb/4f1f200ce13f2a7a180730f964c6c56d25218d6dd40b027c7b5ee1e551f4eb24/93cb84d30291201a84d5676545015220696dbcc72a65a12a0c96cda01dd1d270
+    ./devices/system.slice/docker.service/4f1f200ce13f2a7a180730f964c6c56d25218d6dd40b027c7b5ee1e551f4eb24/93cb84d30291201a84d5676545015220696dbcc72a65a12a0c96cda01dd1d270
+    ./net_cls,net_prio/4f1f200ce13f2a7a180730f964c6c56d25218d6dd40b027c7b5ee1e551f4eb24/93cb84d30291201a84d5676545015220696dbcc72a65a12a0c96cda01dd1d270
+    ./memory/system.slice/docker.service/4f1f200ce13f2a7a180730f964c6c56d25218d6dd40b027c7b5ee1e551f4eb24/93cb84d30291201a84d5676545015220696dbcc72a65a12a0c96cda01dd1d270
+    ./cpu,cpuacct/system.slice/docker.service/4f1f200ce13f2a7a180730f964c6c56d25218d6dd40b027c7b5ee1e551f4eb24/93cb84d30291201a84d5676545015220696dbcc72a65a12a0c96cda01dd1d270
+    ./cpuset/4f1f200ce13f2a7a180730f964c6c56d25218d6dd40b027c7b5ee1e551f4eb24/93cb84d30291201a84d5676545015220696dbcc72a65a12a0c96cda01dd1d270
+    ./freezer/4f1f200ce13f2a7a180730f964c6c56d25218d6dd40b027c7b5ee1e551f4eb24/93cb84d30291201a84d5676545015220696dbcc72a65a12a0c96cda01dd1d270
+    ./perf_event/4f1f200ce13f2a7a180730f964c6c56d25218d6dd40b027c7b5ee1e551f4eb24/93cb84d30291201a84d5676545015220696dbcc72a65a12a0c96cda01dd1d270
+    ./systemd/system.slice/docker.service/4f1f200ce13f2a7a180730f964c6c56d25218d6dd40b027c7b5ee1e551f4eb24/93cb84d30291201a84d5676545015220696dbcc72a65a12a0c96cda01dd1d270
+
+You should see the same result if you have a look in the running container's  
+`/proc/self/cgroup` file.
+
+Within each cgroup resides a collection of files specific to the controlled resource, some of which are used to limit aspects of the resource, and some of which are used for monitoring aspects of the resource. They should be fairly obvious what they are based on their names. You can not exceed the resource limits of the cgroup that your cgroup is nested within. There are ways in which you can get visibility into any containers resource usage. One quick and simple way is with the:  
+[`docker stats`](https://docs.docker.com/engine/reference/commandline/stats/)` [containerId]`  
+command, which will give you a line with your containers CPU usage, Memory usage and Limit, Net I/O, Block I/O, Number of PIDs. There are so many other sources of container resource usage. Check the [Docker engine runtime metrics](https://docs.docker.com/engine/admin/runmetrics/) documentation for additional details.
+
+The most granular information can be found in the statistical files within the cgroup directories listed above.  
+The `/proc/[pid]/cgroup` file provides a description of the cgroups that the process with the specified PID belongs to. You can see this in the following `cat` output. The information provided is different for cgroups version 1 and version 2 hierarchies, for this example, we are focussing on version 1. Docker abstracts all of this anyway, so it is just to show you how things hang together:
+
+{linenos=off, lang=bash}
+    cat /proc/`docker inspect -f '{{ .State.Pid }}' cgroup-test2`/cgroup
+    11:blkio:/system.slice/docker.service/4f1f200ce13f2a7a180730f964c6c56d25218d6dd40b027c7b5ee1e551f4eb24/93cb84d30291201a84d5676545015220696dbcc72a65a12a0c96cda01dd1d270
+    10:pids:/system.slice/docker.service/4f1f200ce13f2a7a180730f964c6c56d25218d6dd40b027c7b5ee1e551f4eb24/93cb84d30291201a84d5676545015220696dbcc72a65a12a0c96cda01dd1d270
+    9:hugetlb:/4f1f200ce13f2a7a180730f964c6c56d25218d6dd40b027c7b5ee1e551f4eb24/93cb84d30291201a84d5676545015220696dbcc72a65a12a0c96cda01dd1d270
+    8:devices:/system.slice/docker.service/4f1f200ce13f2a7a180730f964c6c56d25218d6dd40b027c7b5ee1e551f4eb24/93cb84d30291201a84d5676545015220696dbcc72a65a12a0c96cda01dd1d270
+    7:net_cls,net_prio:/4f1f200ce13f2a7a180730f964c6c56d25218d6dd40b027c7b5ee1e551f4eb24/93cb84d30291201a84d5676545015220696dbcc72a65a12a0c96cda01dd1d270
+    6:memory:/system.slice/docker.service/4f1f200ce13f2a7a180730f964c6c56d25218d6dd40b027c7b5ee1e551f4eb24/93cb84d30291201a84d5676545015220696dbcc72a65a12a0c96cda01dd1d270
+    5:cpu,cpuacct:/system.slice/docker.service/4f1f200ce13f2a7a180730f964c6c56d25218d6dd40b027c7b5ee1e551f4eb24/93cb84d30291201a84d5676545015220696dbcc72a65a12a0c96cda01dd1d270
+    4:cpuset:/4f1f200ce13f2a7a180730f964c6c56d25218d6dd40b027c7b5ee1e551f4eb24/93cb84d30291201a84d5676545015220696dbcc72a65a12a0c96cda01dd1d270
+    3:freezer:/4f1f200ce13f2a7a180730f964c6c56d25218d6dd40b027c7b5ee1e551f4eb24/93cb84d30291201a84d5676545015220696dbcc72a65a12a0c96cda01dd1d270
+    2:perf_event:/4f1f200ce13f2a7a180730f964c6c56d25218d6dd40b027c7b5ee1e551f4eb24/93cb84d30291201a84d5676545015220696dbcc72a65a12a0c96cda01dd1d270
+    1:name=systemd:/system.slice/docker.service/4f1f200ce13f2a7a180730f964c6c56d25218d6dd40b027c7b5ee1e551f4eb24/93cb84d30291201a84d5676545015220696dbcc72a65a12a0c96cda01dd1d270
+
+Each row of the above file depicts one of the cgroup hierarchies that the process, or Docker container in our case, is a member of. The row consists of three fields separated by colon, in the form:  
+`hierarchy-Id:list-of-controllers-bound-to-hierarchy:cgroup-path`  
+If you remember back to our review of the `/proc/cgroups` file above, you will notice that the:
+
+1. hierarchy unique Id is represented here as the `hierarchy-Id`
+2. subsys_name is represented here in the comma separated list-of-controllers-bound-to-hierarchy
+3. Unrelated to `/proc/cgroups`, the third field contains relative to the mount point of the hierarchy the pathname of the cgroup in the hierarchy to which the process belongs. You can see this reflected with the  
+`/sys/fs/cgroup   find -name "93cb84d30291*"`  
+from above
+
+**Fork Bomb from Container**  
+
+With a little help from the [CIS Docker Benchmark](https://benchmarks.cisecurity.org/tools2/docker/CIS_Docker_1.13.0_Benchmark_v1.0.0.pdf) we can use the `PID`s cgroup limit:
+
+Run the containers with `--pids-limit` (kernel version 4.3+) and set a sensible value for maximum number of processes that the container can run, based on what the container is expected to be doing. By default the PidsLimit value displayed with the following command will be 0. 0 or -1 means that any number of processes can be forked within the container:
+
+{title="Query", linenos=off, lang=bash}
+    docker inspect -f '{{ .Id }}: PidsLimit={{ .HostConfig.PidsLimit }}' cgroup-test2
+
+{title="Result", linenos=off, lang=bash}
+    93cb84d30291201a84d5676545015220696dbcc72a65a12a0c96cda01dd1d270: PidsLimit=0
+
+{linenos=off, lang=bash}
+    docker run -it --pids-limit=50 --rm --cgroup-parent=4f1f200ce13f2a7a180730f964c6c56d25218d6dd40b027c7b5ee1e551f4eb24 --name=cgroup-test2 ubuntu
+    root@a26c39377af9:/# 
+
+{title="Query", linenos=off, lang=bash}
+    docker inspect -f '{{ .Id }}: PidsLimit={{ .HostConfig.PidsLimit }}' 
+
+{title="Result", linenos=off, lang=bash}
+    cgroup-test2 a26c39377af9ce6554a1b6a8bffb2043c2c5326455d64c2c8a8cfe53b30b7234: PidsLimit=50
