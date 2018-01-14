@@ -11,7 +11,9 @@ mainmatter:
    markdown/main/chapter2.md
    
    markdown/main/chapter3.md
-   
+
+   markdown/main/chapter4.md
+
 backmatter:
 
    markdown/back/additional-resources.md

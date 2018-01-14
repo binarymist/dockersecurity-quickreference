@@ -684,3 +684,33 @@ According to the Linux [man page for capabilities](http://man7.org/linux/man-pag
 By default, the following capabilities are available to the default user of root within a container, check the man page for the full descriptions of the capabilities. The very knowledgeable Dan Walsh, who is one of the experts when it comes to applying least privilege to containers, also [discusses these](http://rhelblog.redhat.com/2016/10/17/secure-your-containers-with-this-one-weird-trick/): `chown`, `dac_override`, `fowner`, `fsetid`, `kill`, `setgid`, `setuid`, `setpcap`, `net_bind_service`, `net_raw`, `sys_chroot`, `mknod`, `audit_write`, `setfcap`. `net_bind_service` for example allows the superuser to bind a socket to a privileged port <1024 if enabled. The Open Container Initiative (OCI) [runC specification](https://github.com/opencontainers/runc/tree/6c22e77604689db8725fa866f0f2ec0b3e8c3a07#running-containers) is considerably more restrictive, only enabling three capabilities: `audit_write`, `kill`, `net_bind_service`
 
 As stated on the Docker Engine [security page](https://docs.docker.com/engine/security/security/): "_One primary risk with running Docker containers is that the default set of capabilities and mounts given to a container may provide incomplete isolation, either independently, or when used in combination with kernel vulnerabilities._"
+
+## Capabilities (Countermeasures) {#hardening-docker-host-engine-and-containers-capabilities-countermeasures}
+
+There are several ways you can [minimise your set of capabilities](http://rhelblog.redhat.com/2016/10/17/secure-your-containers-with-this-one-weird-trick/) that the root user of the container will run. `pscap` is a useful command from the `libcap-ng-utils` package in Debian and some other distributions. Once installed, you can check which capabilities your container built from the `<amazing>` image runs with, by:
+
+{linenos=off, lang=Bash}
+    docker run -d <amazing> sleep 5 >/dev/null; pscap | grep sleep
+    # This will show which capabilities sleep within container is running as.
+    # By default, it will be the list shown in the Identify Risks section.
+
+In order to drop capabilities `setfcap`, `audit_write`, and `mknod`, you could run:
+
+{linenos=off, lang=Bash}
+    docker run -d --cap-drop=setfcap --cap-drop=audit_write --cap-drop=mknod <amazing> sleep 5 > /dev/null; pscap | grep sleep
+    # This will show that sleep within the container no longer has enabled:
+    # setfcap, audit_write, or mknod
+
+Or just drop all capabilities and only add what you need:
+
+{linenos=off, lang=Bash}
+    docker run -d --cap-drop=all --cap-add=audit_write --cap-add=kill --cap-add=setgid --cap-add=setuid <amazing> sleep 5 > /dev/null; pscap | grep sleep
+    # This will show that sleep within the container is only running with
+    # audit_write, kill, setgid and setuid.
+
+Another way of auditing the capabilities of your container is with the following command from [CIS Docker Benchmark](https://benchmarks.cisecurity.org/tools2/docker/CIS_Docker_1.13.0_Benchmark_v1.0.0.pdf):
+
+{linenos=off, lang=Bash}
+    docker ps --quiet | xargs docker inspect --format '{{ .Id }}: CapAdd={{ .HostConfig.CapAdd }} CapDrop={{ .HostConfig.CapDrop }}'
+
+Alternatively you can modify the container manifest directly. See the [runC section](#runc-and-where-it-fits-in) for this.
