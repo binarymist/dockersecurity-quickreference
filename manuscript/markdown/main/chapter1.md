@@ -64,3 +64,14 @@ Your priority before you start testing images for vulnerable contents, is to und
         
     3. By specifying a digest tag in a `FROM` instruction in your `Dockerfile`, when you `pull` the same image will be fetched.
 
+## Doppelganger images
+![](images/ThreatTags/average-common-average-severe.png)
+
+Beware of doppelganger images that will be available for all to consume, similar to doppelganger packages that I discuss in the Web Applications chapter of Fascicle 1 of my book [Holistic Info-Sec for Web Developers](https://f1.holisticinfosecforwebdevelopers.com/) . These can contain a huge number of packages and code that can be used to hide malware in a Docker image.
+
+People often miss-type what they want to install. Attackers often take advantage of this by creating malicious packages with very similar names. Some of the actions could be: having consumers of your package destroy or modify their systems, send sensitive information to the attacker, or any number of other malicious activities.
+
+![](images/ThreatTags/PreventionAVERAGE.png)
+
+If you are already performing the last step from above, then fetching an image with a very similar name becomes highly unlikely, but it pays to be aware of these types of techniques that attackers use.
+
