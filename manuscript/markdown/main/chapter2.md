@@ -51,3 +51,25 @@ The hosted service selects and analyses popular container images from Docker Hub
 It performs a similar job to that of Clair, but does not look as simple. It also looks for source code secrets, API keys, passwords, etc. in images.
 
 It's designed to integrate into your CI/CD pipeline and integrates with Kubernetes, Docker, Jenkins, CoreOS, Mesos
+
+## [TwistLock](https://www.twistlock.com/) {#vps-countermeasures-docker-hardening-docker-host-engine-and-containers-twistlock}
+
+TwistLock is a fairly comprehensive and complete proprietary offering with a free developer edition. The following details were taken from TwistLock marketing pages:
+
+Features of Trust:
+
+* Discover and manage vulnerabilities in images
+* Uses CVE data sources similar to CoreOS Clair
+* Can scan registries: Docker Hub, Google Container Registry, EC2 Container Registry, Artifactory, Nexus Registry, and images for vulnerabilities in code and configuration
+* Enforce and verify standard configurations
+* Hardening checks on images based on CIS Docker benchmark
+* Real-time vulnerability and threat intelligence
+* Provide out-of-box plugins for vulnerability reporting directly into Jenkins and TeamCity
+* Provides a set of APIs for developers to access almost all of the TwistLock core functions
+
+Features of Runtime:
+
+* Policy enforcement
+* Detect anomalies, uses open source CVE feeds, commercial threat and vulnerability sources, as well as TwistLock's own Lab research
+* Defend and adapt against active threats and compromises using machine learning
+* Governs access control to individual APIs of Docker Engine, Kubernetes, and Docker Swarm, providing LDAP/AD integration.
