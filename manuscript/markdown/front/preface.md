@@ -9,15 +9,15 @@ I usually use bruce schneier's Sensible Security Model when threat modelling. Wi
 
 ## Purpose
 
-My intention with this book is for it to serve as a reference to help you increase the likelihood of resisting attacks from your adversaries, at the same time not getting bogged down in hundreds of pages of content.
+My intention with this book is for it to serve as a reference to help you increase the likelihood of resisting attacks from your adversaries targeting your Docker based applications and services, at the same time not getting bogged down in hundreds of pages of content.
 
-I've found the content of this book most useful when read in conjunction with the Cisecurity Benchmark for Docker, so I'm hoping it will for you also.
+I've found the content of this book most useful when read in conjunction with the Cisecurity Benchmark for Docker, I would recommend you also read both items together.
 
 Please contact me if you don't understand something within the book at: [binarymist.io/#contact](https://binarymist.io/#contact). If you find any errors, please:
 
 * Submit a pull request at [github.com/binarymist/dockersecurity-quickreference/pulls](https://github.com/binarymist/dockersecurity-quickreference/pulls) or
-* Create an issue (github.com/binarymist/dockersecurity-quickreference/issues)(https://github.com/binarymist/dockersecurity-quickreference/issues)
+* Create an issue at [github.com/binarymist/dockersecurity-quickreference/issues](https://github.com/binarymist/dockersecurity-quickreference/issues)
 
 ## Reason
 
-My tech communities encouraged me to put on paper what was in my head. I also hosted an interview with Docker Security Team Lead Diogo Mónica, in which I performed a couple of weeks research. I thought it made sense to consolidate as much of my knowledge and experience around Docker security as I had quickly accessible, then to pass it on to you to help improve the security posture of your Docker deployments.
+Colleagues from my tech communities encouraged me to put on paper what was in my head around Docker security. I also hosted an interview with Docker Security Team Lead Diogo Monica, in which I performed a couple of weeks research. I thought it made sense to consolidate as much of my knowledge and experience around Docker security as I had quickly accessible, then to pass it on to you to help improve the security posture of your Docker deployments.
