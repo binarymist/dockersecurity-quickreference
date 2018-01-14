@@ -676,3 +676,11 @@ Run the containers with `--pids-limit` (kernel version 4.3+) and set a sensible 
 
 {title="Result", linenos=off, lang=bash}
     cgroup-test2 a26c39377af9ce6554a1b6a8bffb2043c2c5326455d64c2c8a8cfe53b30b7234: PidsLimit=50
+
+## Capabilities (Risks)
+
+According to the Linux [man page for capabilities](http://man7.org/linux/man-pages/man7/capabilities.7.html), "_Linux divides the privileges traditionally associated with superuser into distinct units, known as capabilities, which can be independently enabled and disabled_". This is on a per thread basis. Root, with all capabilities, has privileges to do everything. According to the man page, there are currently 38 capabilities.
+
+By default, the following capabilities are available to the default user of root within a container, check the man page for the full descriptions of the capabilities. The very knowledgeable Dan Walsh, who is one of the experts when it comes to applying least privilege to containers, also [discusses these](http://rhelblog.redhat.com/2016/10/17/secure-your-containers-with-this-one-weird-trick/): `chown`, `dac_override`, `fowner`, `fsetid`, `kill`, `setgid`, `setuid`, `setpcap`, `net_bind_service`, `net_raw`, `sys_chroot`, `mknod`, `audit_write`, `setfcap`. `net_bind_service` for example allows the superuser to bind a socket to a privileged port <1024 if enabled. The Open Container Initiative (OCI) [runC specification](https://github.com/opencontainers/runc/tree/6c22e77604689db8725fa866f0f2ec0b3e8c3a07#running-containers) is considerably more restrictive, only enabling three capabilities: `audit_write`, `kill`, `net_bind_service`
+
+As stated on the Docker Engine [security page](https://docs.docker.com/engine/security/security/): "_One primary risk with running Docker containers is that the default set of capabilities and mounts given to a container may provide incomplete isolation, either independently, or when used in combination with kernel vulnerabilities._"
