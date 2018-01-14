@@ -720,3 +720,74 @@ Alternatively you can modify the container manifest directly. See the [runC sect
 A little history to start with: In the early 1990s, Linux was developed as a clone of the Unix Operating system. The core Unix security model, which is a form of [Discretionary Access Control](https://en.wikipedia.org/wiki/Discretionary_access_control) (DAC), was inherited by Linux. I have provided a glimpse of some of the Linux kernel security features that have been developed since the inception of Linux. The Unix DAC remains at the core of Linux. The Unix DAC allows a subject and/or the group of an identity to set the security policy for a specific object. The canonical example is a file, and having a user set the different permissions on who can do what with it. The Unix DAC was [designed in 1969](https://www.linux.com/learn/overview-linux-kernel-security-features), and a lot has changed since then.
  
 Capabilities vary in granularity, attain an understanding of both capabilities and Linux Security Modules (LSMs). Many of the DACs can be circumvented by users. Finer grained control is often required along with Mandatory Access Control (MAC).
+
+## Linux Security Modules (Countermeasures)
+
+Linux Security Modules (LSM) is a framework that has been part of the Linux kernel since 2.6, that supports security models implementing Mandatory Access Control (MAC). The currently accepted modules are AppArmor, SELinux, Smack and TOMOYO Linux.
+
+At the [first Linux kernel summit](https://lwn.net/2001/features/KernelSummit/) in 2001, "_Peter Loscocco from the National Security Agency (NSA) presented the design of the mandatory access control system in its SE Linux distribution._" SE Linux had implemented many check points where authorization to perform a particular task was controlled, and a security manager process which implements the actual authorization policy. "_The separation of the checks and the policy mechanism is an important aspect of the system - different sites can implement very different access policies using the same system._" The aim of this separation is to make it harder for the user to not adjust or override policies.
+
+It was realised that there were several security related projects trying to solve the same problem. It was decided to [have the developers](http://www.hep.by/gnu/kernel/lsm/) interested in security [create a](https://lwn.net/Articles/180194/) "_generic interface which could be used by any security policy. The result was the Linux Security Modules (LSM)_" API/framework, which provides many hooks at [security critical points](https://www.linux.com/learn/overview-linux-kernel-security-features) within the kernel.
+
+![](images/LSMFrameworkDesign.png)
+
+LSMs can register with the API and receive callbacks from these hooks when the Unix Discretionary Access Control (DAC) checks succeed, allowing the LSMs Mandatory Access Control (MAC) code to run. The LSMs are not loadable kernel modules, but are instead [selectable at build-time](https://www.kernel.org/doc/Documentation/security/LSM.txt) via `CONFIG_DEFAULT_SECURITY` which takes a comma separated list of LSM names. Commonly multiple LSMs are built into a given kernel and can be overridden at boot time via the [`security=...` kernel command line argument](https://debian-handbook.info/browse/stable/sect.selinux.html#sect.selinux-setup), while also taking a comma separated list of LSM names.
+
+If no specific LSMs are built into the kernel, the default LSM will be the [Linux capabilities](#hardening-docker-host-engine-and-containers-capabilities-countermeasures). "_Most LSMs choose to [extend the capabilities](https://www.kernel.org/doc/Documentation/security/LSM.txt) system, building their checks on top of the defined capability hooks._" A comma separated list of the active security modules can be found in `/sys/kernel/security/lsm`. The list reflects the order in which checks are made, the capability module will always be present and be the first in the list.
+
+**AppArmor LSM in Docker**
+
+If you intend to use [AppArmor](http://wiki.apparmor.net/index.php/QuickProfileLanguage), make sure it is installed, and you have a policy loaded (`apparmor_parser -r [/path/to/your_policy]`) and enforced (`aa-enforce`).
+AppArmor policy's are created using the [profile language](http://wiki.apparmor.net/index.php/ProfileLanguage). Docker will automatically generate and load a default AppArmor policy `docker-default` when you run a container. If you want to override the policy, you do this with the `--security-opt` flag, like:  
+`docker run --security-opt apparmor=your_policy [container-name]`  
+provided that your policy is loaded as mentioned above. There are further details available on the [apparmor page](https://docs.docker.com/engine/security/apparmor/) of Dockers Secure Engine.
+
+**SELinux LSM in Docker**
+
+Red Hat, Fedora, and some other distributions ship with SELinux policies for Docker. Many other distros such as Debian require an install. SELinux needs to be [installed and configured](https://wiki.debian.org/SELinux/Setup) on Debian.
+
+SELinux support for the Docker daemon is [disabled by default](https://github.com/GDSSecurity/Docker-Secure-Deployment-Guidelines) and needs to be [enabled](https://docs.docker.com/engine/reference/commandline/dockerd/) with the following command:
+
+{linenos=off, lang=bash}
+    #Start the Docker daemon with:
+    dockerd --selinux-enabled
+
+Docker daemon options can also be set within the daemon [configuration file](https://docs.docker.com/engine/reference/commandline/dockerd/#daemon-configuration-file)  
+`/etc/docker/daemon.json`  
+by default or by specifying an alternative location with the `--config-file` flag.
+
+Label confinement for the container can be configured using [`--security-opt`](https://github.com/GDSSecurity/Docker-Secure-Deployment-Guidelines) to load SELinux or AppArmor policies as shown in the Docker `run` example below:
+
+[SELinux Labels for Docker](https://www.projectatomic.io/docs/docker-and-selinux/) consist of four parts:
+
+{title="Syntax", linenos=off, lang=bash}
+    # Set the label user for the container.
+    --security-opt="label:user:USER"
+    # Set the label role for the container.
+    --security-opt="label:role:ROLE"
+    # Set the label type for the container.
+    --security-opt="label:type:TYPE"
+    # Set the label level for the container.
+    --security-opt="label:level:LEVEL"
+
+{title="Example", linenos=off, lang=bash}
+    docker run -it --security-opt label=level:s0:c100,c200 ubuntu
+
+SELinux can be enabled in the container using [`setenforce 1`](http://www.unix.com/man-page/debian/8/setenforce/).
+
+SELinux can operate in [one of three modes](https://www.centos.org/docs/5/html/5.2/Deployment_Guide/sec-sel-enable-disable-enforcement.html):
+
+1. `disabled`: not enabled in the kernel
+2. `permissive` or `0`: SELinux is running and logging, but not controlling/enforcing permissions
+3. `enforcing` or `1`: SELinux is running and enforcing policy
+
+To change at runtime: Use the `setenforce [0|1]` command to change between `permissive` and `enforcing`. Test this, set to `enforcing` before persisting it at boot.  
+To persist on boot: [In Debian](https://debian-handbook.info/browse/stable/sect.selinux.html#sect.selinux-setup), set `enforcing=1` in the kernel command line  
+`GRUB_CMDLINE_LINUX` in `/etc/default/grub`  
+and run `update-grub`  
+SELinux will be enforcing after a reboot.
+
+To audit what LSM options you currently have applied to your containers, run the following command from the [CIS Docker Benchmark](https://benchmarks.cisecurity.org/tools2/docker/CIS_Docker_1.13.0_Benchmark_v1.0.0.pdf):
+
+{linenos=off, lang=bash}
+    docker ps --quiet --all | xargs docker inspect --format '{{ .Id }}: SecurityOpt={{ .HostConfig.SecurityOpt }}'
