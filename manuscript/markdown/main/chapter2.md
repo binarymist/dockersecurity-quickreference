@@ -832,7 +832,7 @@ To add system calls to the list of syscalls you want to block for your container
 ## Read-only Containers
 
 In order to set up read-only hosts, physical or virtual, there is a lot of work to be done, and in some cases, it becomes challenging to stop an Operating System writing to some files. I discussed this in depth in the subsections "Partitioning on OS Installation" and "Lock Down the
-Mounting of Partitions" in the VPS chapter of my book: Fascicle 1 of [Holistic Info-Sec for Web Developers](https://f1.holisticinfosecforwebdevelopers.com/) In contrast, running Docker containers as read-only is trivial.
+Mounting of Partitions" in the VPS chapter of my book: Fascicle 1 of [Holistic Info-Sec for Web Developers](https://f1.holisticinfosecforwebdevelopers.com/). In contrast, running Docker containers as read-only is trivial.
 
 Running a container with the `--read-only` flag stops writes to the container.
 
