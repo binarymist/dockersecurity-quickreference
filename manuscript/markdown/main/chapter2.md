@@ -79,7 +79,7 @@ Features of Runtime:
 * [Drydock](https://github.com/zuBux/drydock) is a similar offering to Docker Bench, but not as mature at this stage
 * [Actuary](https://github.com/diogomonica/actuary) is a similar offering to Docker Bench, but not as mature at this stage. I [discussed](http://www.se-radio.net/2017/05/se-radio-episode-290-diogo-monica-on-docker-security/) this project briefly with its creator Diogo Mónica, and it sounds like the focus is on creating a better way of running privileged services on swarm, instead of investing time into this.
 
-## Namespaces {#vps-identify-risks-docker-docker-host-engine-and-containers-namespaces}
+## Namespaces (Risks) {#docker-host-engine-and-containers-namespaces-risks}
 
 The first place to read for solid background on Linux kernel namespaces is the [man-page](http://man7.org/linux/man-pages/man7/namespaces.7.html), otherwise I'd just be repeating what is there. A lot of what follows about namespaces requires some knowledge from the namespaces man-page, so do yourself a favour and read it first.
 
@@ -247,3 +247,228 @@ Docker considers user namespaces to be an advanced feature. There are currently 
 If your containers have a predefined non-root user, then, currently, user namespaces should not be enabled, due to possible unpredictable issues and complexities, according to "2.8 Enable user namespace support" of the [CIS Docker Benchmark](https://benchmarks.cisecurity.org/tools2/docker/CIS_Docker_1.13.0_Benchmark_v1.0.0.pdf).  
 The problem is that these mappings are performed on the Docker daemon rather than at a per-container level, so it is an all or nothing approach. This may change in the future though.  
 As mentioned, user namespace support is available, but not enabled by default in the Docker daemon.
+
+## Namespaces (Countermeasures) {#docker-host-engine-and-containers-namespaces-countermeasures}
+
+
+1. `mnt`: Keep the default propagation mode of `private` unless you have a very good reason to change it. If you do need to change it, think about defence in depth and employ other defence strategies.  
+    
+    If you have control over the Docker host, lock down the mounting of the host systems partitions as I discussed in the Lock Down the Mounting of Partitions subsection of the VPS chapter of my book [Fascicle 1 Holistic Info-Sec for Web Developers](https://f1.holisticinfosecforwebdevelopers.com/).
+    
+    If you have to mount a sensitive host system directory, mount it as read-only:
+    
+    {linenos=off, lang=bash}
+        docker run -it --rm -v /etc:/hosts-etc:ro --name=lets-mount-etc ubuntu
+    
+    If any file modifications are now attempted on `/etc` they will be unsuccessful.
+    
+    {title="Query", linenos=off, lang=bash}
+        docker inspect -f "{{ json .Mounts }}" lets-mount-etc
+    
+    {title="Result", linenos=off, lang=bash}
+        [
+          {
+            "Type":"bind",
+            "Source":"/etc",
+            "Destination":"/hosts-etc",
+            "Mode":"ro",
+            "RW":false,
+            "Propagation":""
+          }
+        ]
+    
+    Also, as discussed previously, lock down the user to non-root.
+    
+    If you are using LSM, you will probably want to use the `Z` option as discussed in the risks section.  
+    
+2. `PID`: By default enforces isolation from the containers `PID` namespace, but not from the host to the container. If you are concerned about host systems being able to access your containers, as you should be, consider putting your containers within a VM  
+    
+3. `net`: A network namespace is a virtualisation of the network stack, with its own network devices, IP routing tables, firewall rules and ports.  
+When a network namespace is created the only network interface that is created is the loopback interface, which is down until brought up.  
+Each network interface, whether physical or virtual, can only reside in one namespace, but can be moved between namespaces.  
+    
+    When the last process in a network namespace terminates, the namespace will be destroyed, destroy any virtual interfaces within it, and move any physical network devices back to the initial network namespace, not the process parent.
+
+    **Docker and Network Namespaces**
+    
+    A Docker network is analogous to a Linux kernel network namespace.
+    
+    When Docker is installed, three networks are created `bridge`, `host` and `null`, which you can think of as network namespaces. These can be seen by running: [`docker network ls`](https://docs.docker.com/engine/reference/commandline/network_ls/)
+    
+    {linenos=off, lang=bash}
+        NETWORK ID    NAME              DRIVER   SCOPE
+        9897a3063354  bridge            bridge   local
+        fe179428ccd4  host              host     local
+        a81e8669bda7  none              null     local
+    
+    When you run a container, if you want to override the default network of `bridge`, you can specify which network in which you want to run the container with the `--network` flag as the following:  
+    `docker run --network=<network>`
+    
+    The bridge can be seen by running `ifconfig` on the host:
+    
+    {linenos=off, lang=bash}
+        docker0   Link encap:Ethernet  HWaddr 05:22:bb:08:41:b7  
+                  inet addr:172.17.0.1  Bcast:0.0.0.0  Mask:255.255.0.0
+                  inet6 addr: fe80::42:fbff:fe80:57a5/64 Scope:Link
+    
+    When the Docker engine (CLI) client or API tells the Docker daemon to run a container, part of the process allocates a bridged interface, unless specified otherwise, that allows processes within the container to communicate to the system host via the virtual Ethernet bridge.
+    
+    Virtual Ethernet interfaces, when created, are always created as a pair. You can think of them as one interface on each side of a namespace wall with a tube through the wall connecting them. Packets come in one interface and exit the other, and vice versa.
+    
+    **Creating and Listing Network NameSpaces**
+    
+    Some of these commands you will need to run as root.
+    
+    Create:
+    
+    {title="Syntax", linenos=off, lang=bash}
+        ip netns add <yournamespacename>
+    
+    {title="Example", linenos=off, lang=bash}
+        ip netns add testnamespace
+    
+    This ip command adds a bind mount point for the `testnamespace` namespace to `/var/run/netns/`. When the `testnamespace` namespace is created, the resulting file descriptor keeps the network namespace alive and persisted. This allows system administrators to apply configuration to the network namespace without fear that it will disappear when no processes are within it.
+    
+    {title="Verify it was added", linenos=off, lang=bash}
+        ip netns list
+    
+    {title="Result", linenos=off, lang=bash}
+        testnamespace
+    
+    However, a network namespace added in this way cannot be used for a Docker container. In order to create a [Docker network](https://docs.docker.com/engine/userguide/networking/) called `kimsdockernet` run the following command:
+    
+    {linenos=off, lang=bash}
+        # bridge is the default driver, so not required to be specified
+        docker network create --driver bridge kimsdockernet
+    
+    You can then follow this with a  
+    `docker network ls`  
+    to confirm that the network was added. You can base your network on one of the existing [network drivers](https://docs.docker.com/engine/reference/run/#network-settings) created by Docker, the bridge driver is used by default.
+    
+    [`bridge`](https://docs.docker.com/engine/reference/run/#network-bridge): As seen above with the `ifconfig` listing on the host system, an interface is created called docker0 when Docker is installed. A pair of veth (Virtual Ethernet) interfaces are created when the container is run with this `--network` option. The `veth` on the outside of the container will be attached to the bridge, the other `veth` is put inside the container's namespace, along with the existing loopback interface.  
+    [`none`](https://docs.docker.com/engine/reference/run/#network-none): There will be no networking in the container other than the loopback interface which was created when the network namespace was created, and has no routes to external traffic.  
+    [`host`](https://docs.docker.com/engine/reference/run/#network-host): Uses the network stack that the host system uses inside the container. The `host` mode is more performant than the `bridge` mode due to using the hosts native network stack, but also less secure.  
+    [`container`](https://docs.docker.com/engine/reference/run/#network-container): Allows you to specify another container to use its network stack.
+    
+    When running  
+    `docker network inspect kimsdockernet`  
+    before starting the container, and then again after, you will see the new container added to the `kimsdockernet` network.
+    
+    Now you can run your container using your new network:
+    
+    {linenos=off, lang=bash}
+        docker run -it --network kimsdockernet --rm --name=container0 ubuntu
+    
+    When one or more processes, Docker containers in this case, uses the `kimsdockernet` network, it can also be seen opened by the presence of its file descriptor at:
+    
+    `/var/run/docker/netns/<filedescriptor>`
+    
+    You can also see that the container named `container0` has a network namespace by running the following command, which shows the file handles for the namespaces, and not just the network namespace:
+    
+    {title="Query Namespaces", linenos=off, lang=bash}
+        sudo ls /proc/`docker inspect -f '{{ .State.Pid }}' container0`/ns -liah
+    
+    {title="Result", linenos=off, lang=bash}
+        total 0
+        1589018 dr-x--x--x 2 root root 0 Mar 14 16:35 .
+        1587630 dr-xr-xr-x 9 root root 0 Mar 14 16:35 ..
+        1722671 lrwxrwxrwx 1 root root 0 Mar 14 17:33 cgroup -> cgroup:[4026531835]
+        1722667 lrwxrwxrwx 1 root root 0 Mar 14 17:33 ipc -> ipc:[4026532634]
+        1722670 lrwxrwxrwx 1 root root 0 Mar 14 17:33 mnt -> mnt:[4026532632]
+        1589019 lrwxrwxrwx 1 root root 0 Mar 14 16:35 net -> net:[4026532637]
+        1722668 lrwxrwxrwx 1 root root 0 Mar 14 17:33 pid -> pid:[4026532635]
+        1722669 lrwxrwxrwx 1 root root 0 Mar 14 17:33 user -> user:[4026531837]
+        1722666 lrwxrwxrwx 1 root root 0 Mar 14 17:33 uts -> uts:[4026532633]
+    
+    If you run  
+    `ip netns list`  
+    again, you may think that you should be able to see the Docker network, but you will not, unless you create the following symlink:
+    
+    {linenos=off, lang=bash}
+        ln -s /proc/`docker inspect -f '{{.State.Pid}}' container0`/ns/net /var/run/netns/container0
+        # Don't forget to remove the symlink once the container terminates,
+        # else it will be dangling.
+    
+    If you want to run a command inside of the Docker network of a container, you can use the [`nsenter`](http://man7.org/linux/man-pages/man1/nsenter.1.html) command of the `util-linux` package:
+    
+    {linenos=off, lang=bash}
+        # Show the ethernet state:
+        nsenter -t `docker inspect -f '{{ .State.Pid }}' container0` -n ifconfig
+        # Or
+        nsenter -t `docker inspect -f '{{ .State.Pid }}' container0` -n ip addr show
+        # Or
+        nsenter --net=/var/run/docker/netns/<filedescriptor> ifconfig
+        # Or
+        nsenter --net=/var/run/docker/netns/<filedescriptor> ip addr show
+    
+    **Deleting Network NameSpaces**
+    
+    The following command will remove the bind mount for the specified namespace. The namespace will continue to persist until all processes within it are terminated, at which point any virtual interfaces within it will be destroyed and any physical network devices if they were assigned, would be moved back to the initial network namespace, not the process parent.
+    
+    {title="Syntax", linenos=off, lang=bash}
+        ip netns delete <yournamespacename>
+    
+    {title="Example", linenos=off, lang=bash}
+        ip netns delete testnamespace  
+    
+    {title="To remove a docker network", linenos=off, lang=bash}
+        docker network rm kimsdockernet
+    
+    If you still have a container running, you will receive an error:  
+    `Error response from daemon: network kimsdockernet has active endpoints`  
+    Stop your container and try again.
+    
+    It also pays to [understand container communication](https://docs.docker.com/engine/userguide/networking/default_network/container-communication/) with each other.
+    
+    Also checkout the [Additional Resources](#additional-resources).  
+    
+4. `UTS` Do not start your containers with the `--uts` flag set to `host`  
+As mentioned in the CIS\_Docker\_1.13.0\_Benchmark "_Sharing the UTS namespace with the host provides full permission to the container to change the hostname of the host. This is insecure and should not be allowed._". You can test that the container is not sharing the host's UTS namespace by making sure that the following command returns nothing, instead of `host`:
+    
+    {linenos=off, lang=bash}
+        docker ps --quiet --all | xargs docker inspect --format '{{ .Id }}: UTSMode={{ .HostConfig.UTSMode }}'
+    
+5. `IPC`: In order to stop another untrusted container sharing your containers IPC namespace, you could isolate all of your trusted containers in a VM, or if you are using some type of orchestration, that will usually have functionality to isolate groups of containers. If you can isolate your trusted containers sufficiently, then you may still be able to share the IPC namespace of other near by containers.
+    
+6. `user`: If you have read the [risks section](#docker-host-engine-and-containers-namespaces-risks) and still want to enable support for user namespaces, you first need to confirm that the host user of the associated containers `PID` is not root by running the following CIS Docker Benchmark recommended commands:
+    
+    {linenos=off, lang=Bash}
+        ps -p $(docker inspect --format='{{ .State.Pid }}' <CONTAINER ID>) -o pid,user
+    
+    Or, you can run the following command and make sure that the `userns` is listed under the `SecurityOptions`
+    
+    {linenos=off, lang=Bash}
+        docker info --format '{{ .SecurityOptions }}'
+    
+    Once you have confirmed that your containers are not being run as root, you can look at enabling user namespace support on the Docker daemon.
+    
+    The `/etc/subuid` and `/etc/subgid` host files will be read for the user and optional group supplied to the `--userns-remap` option of `dockerd`.
+    
+    The `--userns-remap` option accepts the following value types:
+    
+    * `uid`
+    * `uid:gid`
+    * `username`
+    * `username:groupname`  
+    
+    The username must exist in the `/etc/passwd` file, the `sbin/nologin` users are [also valid](https://success.docker.com/KBase/Introduction_to_User_Namespaces_in_Docker_Engine). Subordinate user Id and group Id ranges need to be specified in `/etc/subuid` and `/etc/subuid` respectively.
+    
+    "_The UID/GID we want to remap to [does not need to match](https://success.docker.com/KBase/Introduction_to_User_Namespaces_in_Docker_Engine) the UID/GID of the username in `/etc/passwd`_". It is the entity in the `/etc/subuid` that will be the owner of the Docker daemon and the containers it runs. The value you supply to `--userns-remap` if numeric Ids, will be translated back to the valid user or group names of `/etc/passwd` and `/etc/group` which must exist, if username, groupname, they must match the entities in `/etc/passwd`, `/etc/subuid`, and `/etc/subgid`.
+    
+    Alternatively, if you do not want to specify your own user and/or user:group, you can provide the `default` value to `--userns-remap`, and a default user of `dockremap` along with subordinate uid and gid ranges that will be created in `/etc/passwd` and `/etc/group` if it does not already exist. Then the `/etc/subuid` and `/etc/subgid` files will be [populated](https://docs.docker.com/engine/security/userns-remap/) with a contiguous 65536 length range of subordinate user and group Ids respectively, starting at the offset of the existing entries in those files.
+    
+    {linenos=off, lang=Bash}
+        # As root, run:
+        dockerd --userns-remap=default
+    
+    If `dockremap` does not already exist, it will be created:
+    
+    {title="/etc/subuid and /etc/subgid", linenos=off, lang=Bash}
+        <existinguser>:100000:65536
+        dockremap:165536:65536
+    
+    There are rules about providing multiple range segments in the `/etc/subuid`, `/etc/subgid` files, but that is beyond the scope of what I am providing here. For those advanced scenario details, check out the [Docker engine reference](https://github.com/jquast/docker/blob/2fd674a00f98469caa1ceb572e5ae92a68b52f44/docs/reference/commandline/dockerd.md#detailed-information-on-subuidsubgid-ranges). The simplest scenario is to use a single contiguous range as seen in the above example, this will cause Docker to map the hosts user and group Ids to the container process using as much of the `165536:65536` range as necessary. For example, the host's root user would be mapped to `165536`, the next host user would be mapped to container user `165537`, and so on until the 65536 possible Ids are all mapped. Processes run as root inside the container are owned by the subordinate uid outside of the container.
+    
+    **Disabling user namespace for specific containers**
+    
+    In order to disable user namespace mapping, on a per container basis, once enabled for the Docker daemon, you could supply the `--userns=host` value to either of the `run`, `exec` or `create` Docker commands. This would mean the default user within the container was mapped to the host's root.
