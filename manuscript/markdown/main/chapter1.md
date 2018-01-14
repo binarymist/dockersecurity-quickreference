@@ -67,11 +67,160 @@ Your priority before you start testing images for vulnerable contents, is to und
 ## Doppelganger images
 ![](images/ThreatTags/average-common-average-severe.png)
 
-Beware of doppelganger images that will be available for all to consume, similar to doppelganger packages that I discuss in the Web Applications chapter of Fascicle 1 of my book [Holistic Info-Sec for Web Developers](https://f1.holisticinfosecforwebdevelopers.com/) . These can contain a huge number of packages and code that can be used to hide malware in a Docker image.
+Beware of doppelganger images that will be available for all to consume, similar to doppelganger packages that I discuss in the Web Applications chapter of Fascicle 1 of my book [Holistic Info-Sec for Web Developers](https://f1.holisticinfosecforwebdevelopers.com/), these can contain a huge number of packages and code that can be used to hide malware in a Docker image.
 
 People often miss-type what they want to install. Attackers often take advantage of this by creating malicious packages with very similar names. Some of the actions could be: having consumers of your package destroy or modify their systems, send sensitive information to the attacker, or any number of other malicious activities.
 
 ![](images/ThreatTags/PreventionAVERAGE.png)
 
-If you are already performing the last step from above, then fetching an image with a very similar name becomes highly unlikely, but it pays to be aware of these types of techniques that attackers use.
+If you are already performing step 3 from above, then fetching an image with a very similar name becomes highly unlikely, but it pays to be aware of these types of techniques that attackers use.
+
+## The Default User is Root {#the-default-user-is-root}
+![](images/ThreatTags/easy-common-veryeasy-moderate.png)
+
+What is worse, Docker's default is to run containers, and all commands / processes within a container as root. This can be seen by running the following command from the [CIS_Docker_1.13.0_Benchmark](https://benchmarks.cisecurity.org/tools2/docker/CIS_Docker_1.13.0_Benchmark_v1.0.0.pdf):
+
+{title="Query User running containers", linenos=off, lang=Bash}
+    docker ps --quiet | xargs docker inspect --format '{{ .Id }}: User={{ .Config.User }}'
+
+If you have two containers running, and the user has not been specified, you will see something like the below, which means your two containers are running as root.
+
+{title="Result of user running containers output", linenos=off, lang=Bash}
+    <container n Id>: User=
+    <container n+1 Id>: User=
+
+Images derived from other images inherit the same user defined in the parent image explicitly or implicitly, so unless the image creator has specifically defined a non-root user, the user will default to root. That means all processes within the container will run as root.
+
+![](images/ThreatTags/PreventionVERYEASY.png)
+
+In order to run containers as a non-root user, the user needs to be added in the base image (`Dockerfile`) if it is under your control, and set before any commands you want run as a non-root user. Here is an example of the [NodeGoat](https://github.com/owasp/nodegoat) image:
+
+{title="NodeGoat Dockerfile", linenos=on}
+    FROM node:4.4
+    
+    # Create an environment variable in our image for the non-root user we want to use.
+    ENV user nodegoat_docker
+    ENV workdir /usr/src/app/
+    
+    # Home is required for npm install. System account with no ability to login to shell
+    RUN useradd --create-home --system --shell /bin/false $user
+    
+    RUN mkdir --parents $workdir
+    WORKDIR $workdir
+    COPY package.json $workdir
+    
+    # chown is required by npm install as a non-root user.
+    RUN chown $user:$user --recursive $workdir
+    # Then all further actions including running the containers should
+    # be done under non-root user, unless root is actually required.
+    USER $user
+    
+    RUN npm install
+    COPY . $workdir
+    
+    # Permissions need to be reapplied, due to how docker applies root to new files.
+    USER root
+    RUN chown $user:$user --recursive $workdir
+    RUN chmod --recursive o-wrx $workdir
+    
+    RUN ls -liah
+    RUN ls ../ -liah
+    USER $user
+
+As you can see on line 4 we create our `nodegoat_docker` user.  
+On line 8 we add our non-root user to the image with no ability to login.  
+On line 15 we change the ownership of the `$workdir` so our non-root user has access to do the things that we normally have permissions to do without root, such as installing npm packages and copying files, as we see on line 20 and 21. But first we need to switch to our non-root user on line 18. On lines 25 and 26 we need to reapply ownership and permissions due to the fact that docker does not `COPY` according to the user you are set to run commands as.
+
+Without reapplying the ownership and permissions of the non-root user as seen above on lines 25 and 26, the container directory listings would look like this:
+
+{title="No reapplication of ownership and permissions", linenos=off}
+    Step 12 : RUN ls -liah
+     ---> Running in f8692fc32cc7
+    total 116K
+    13 drwxr-xr-x   9 nodegoat_docker nodegoat_docker 4.0K Sep 13 09:00 .
+    12 drwxr-xr-x   7 root            root            4.0K Sep 13 09:00 ..
+    65 drwxr-xr-x   8 root            root            4.0K Sep 13 08:59 .git
+    53 -rw-r--r--   1 root            root             178 Sep 12 04:22 .gitignore
+    69 -rw-r--r--   1 root            root            1.9K Nov 21  2015 .jshintrc
+    61 -rw-r--r--   1 root            root              55 Nov 21  2015 .nodemonignore
+    58 -rw-r--r--   1 root            root             715 Sep 13 08:59 Dockerfile
+    55 -rw-r--r--   1 root            root            6.6K Sep 12 04:16 Gruntfile.js
+    60 -rw-r--r--   1 root            root             11K Nov 21  2015 LICENSE
+    68 -rw-r--r--   1 root            root              48 Nov 21  2015 Procfile
+    64 -rw-r--r--   1 root            root            5.6K Sep 12 04:22 README.md
+    56 drwxr-xr-x   6 root            root            4.0K Nov 21  2015 app
+    66 -rw-r--r--   1 root            root             527 Nov 15  2015 app.json
+    54 drwxr-xr-x   3 root            root            4.0K May 16 11:41 artifacts
+    62 drwxr-xr-x   3 root            root            4.0K Nov 21  2015 config
+    57 -rw-r--r--   1 root            root             244 Sep 13 04:51 docker-compose.yml
+    67 drwxr-xr-x 498 root            root             20K Sep 12 03:50 node_modules
+    63 -rw-r--r--   1 root            root            1.4K Sep 12 04:22 package.json
+    52 -rw-r--r--   1 root            root            4.6K Sep 12 04:01 server.js
+    59 drwxr-xr-x   4 root            root            4.0K Nov 21  2015 test
+     ---> ad42366b24d7
+    Removing intermediate container f8692fc32cc7
+    Step 13 : RUN ls ../ -liah
+     ---> Running in 4074cc02dd1d
+    total 12K
+    12 drwxr-xr-x  7 root            root            4.0K Sep 13 09:00 .
+    11 drwxr-xr-x 32 root            root            4.0K Sep 13 09:00 ..
+    13 drwxr-xr-x  9 nodegoat_docker nodegoat_docker 4.0K Sep 13 09:00 app
+
+With reapplication of the ownership and permissions of the non-root user, as the `Dockerfile` is currently above, the container directory listings look like the following:
+
+{title="With reapplication of ownership and permissions", linenos=off}
+    Step 15 : RUN ls -liah
+     ---> Running in 8662e1657d0f
+    total 116K
+    13 drwxr-x---   21 nodegoat_docker nodegoat_docker 4.0K Sep 13 08:51 .
+    12 drwxr-xr-x    9 root            root            4.0K Sep 13 08:51 ..
+    65 drwxr-x---   20 nodegoat_docker nodegoat_docker 4.0K Sep 13 08:51 .git
+    53 -rw-r-----    1 nodegoat_docker nodegoat_docker  178 Sep 12 04:22 .gitignore
+    69 -rw-r-----    1 nodegoat_docker nodegoat_docker 1.9K Nov 21  2015 .jshintrc
+    61 -rw-r-----    1 nodegoat_docker nodegoat_docker   55 Nov 21  2015 .nodemonignore
+    58 -rw-r-----    1 nodegoat_docker nodegoat_docker  884 Sep 13 08:46 Dockerfile
+    55 -rw-r-----    1 nodegoat_docker nodegoat_docker 6.6K Sep 12 04:16 Gruntfile.js
+    60 -rw-r-----    1 nodegoat_docker nodegoat_docker  11K Nov 21  2015 LICENSE
+    68 -rw-r-----    1 nodegoat_docker nodegoat_docker   48 Nov 21  2015 Procfile
+    64 -rw-r-----    1 nodegoat_docker nodegoat_docker 5.6K Sep 12 04:22 README.md
+    56 drwxr-x---   14 nodegoat_docker nodegoat_docker 4.0K Sep 13 08:51 app
+    66 -rw-r-----    1 nodegoat_docker nodegoat_docker  527 Nov 15  2015 app.json
+    54 drwxr-x---    5 nodegoat_docker nodegoat_docker 4.0K Sep 13 08:51 artifacts
+    62 drwxr-x---    5 nodegoat_docker nodegoat_docker 4.0K Sep 13 08:51 config
+    57 -rw-r-----    1 nodegoat_docker nodegoat_docker  244 Sep 13 04:51 docker-compose.yml
+    67 drwxr-x--- 1428 nodegoat_docker nodegoat_docker  20K Sep 13 08:51 node_modules
+    63 -rw-r-----    1 nodegoat_docker nodegoat_docker 1.4K Sep 12 04:22 package.json
+    52 -rw-r-----    1 nodegoat_docker nodegoat_docker 4.6K Sep 12 04:01 server.js
+    59 drwxr-x---    8 nodegoat_docker nodegoat_docker 4.0K Sep 13 08:51 test
+     ---> b88d816315b1
+    Removing intermediate container 8662e1657d0f
+    Step 16 : RUN ls ../ -liah
+     ---> Running in 0ee2dcc889a6
+    total 12K
+    12 drwxr-xr-x  9 root            root            4.0K Sep 13 08:51 .
+    11 drwxr-xr-x 34 root            root            4.0K Sep 13 08:51 ..
+    13 drwxr-x--- 21 nodegoat_docker nodegoat_docker 4.0K Sep 13 08:51 app
+
+An alternative to setting the non-root user in the `Dockerfile` is to set it in the `docker-compose.yml`, provided that the non-root user has been added to the image in the `Dockerfile`. In the case of NodeGoat, the mongo `Dockerfile` is maintained by DockerHub, and it adds a user called `mongodb`. In the NodeGoat projects `docker-compose.yml`, we just need to set the user, as seen on line 13 below:
+
+{id="nodegoat-docker-compose.yml", title="NodeGoat docker-compose.yml", linenos=on}
+    version: "2.0"
+    
+    services:
+      web:
+        build: .
+        command: bash -c "node artifacts/db-reset.js && npm start"
+        ports:
+          - "4000:4000"
+        links:
+          - mongo
+      mongo:
+        image: mongo:latest
+        user: mongodb
+        expose:
+          - "27017"
+
+Alternatively, a container may be run as a non-root user by  
+`docker run -it --user lowprivuser myimage`  
+but this is not ideal, the specific user should usually be part of the build.
 
