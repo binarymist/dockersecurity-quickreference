@@ -5,13 +5,18 @@
 
 ## Description
 
-I usually use bruce schneier's Sensible Security Model when threat modelling. With this book I've focussed on identifying and addressing the risks and countermeasures that I see most common in Docker deployments. This is targeted toward the DevOps and Software Engineer in a hurry.
+I usually use bruce schneier's Sensible Security Model when threat modelling. With this book I've focussed on identifying and addressing the risks and countermeasures only, that I see most commonly in Docker deployments. This book is targeted toward the DevOps and Software Engineer in a hurry.
 
 ## Purpose
 
 My intention with this book is for it to serve as a reference to help you increase the likelihood of resisting attacks from your adversaries, at the same time not getting bogged down in hundreds of pages of content.
 
-This book is supposed to augment the Cisecurity Benchmark for Docker. Read it in conjunction, that's also what works for me, so I'm hoping it will for you also.
+I've found the content of this book most useful when read in conjunction with the Cisecurity Benchmark for Docker, so I'm hoping it will for you also.
+
+Please contact me if you don't understand something within the book at: [binarymist.io/#contact](https://binarymist.io/#contact). If you find any errors, please:
+
+* Submit a pull request at [github.com/binarymist/dockersecurity-quickreference/pulls](https://github.com/binarymist/dockersecurity-quickreference/pulls) or
+* Create an issue (github.com/binarymist/dockersecurity-quickreference/issues)(https://github.com/binarymist/dockersecurity-quickreference/issues)
 
 ## Reason
 
