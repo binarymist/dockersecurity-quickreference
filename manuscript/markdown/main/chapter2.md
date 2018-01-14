@@ -73,3 +73,8 @@ Features of Runtime:
 * Detect anomalies, uses open source CVE feeds, commercial threat and vulnerability sources, as well as TwistLock's own Lab research
 * Defend and adapt against active threats and compromises using machine learning
 * Governs access control to individual APIs of Docker Engine, Kubernetes, and Docker Swarm, providing LDAP/AD integration.
+
+## Possible contenders to watch
+
+* [Drydock](https://github.com/zuBux/drydock) is a similar offering to Docker Bench, but not as mature at this stage
+* [Actuary](https://github.com/diogomonica/actuary) is a similar offering to Docker Bench, but not as mature at this stage. I [discussed](http://www.se-radio.net/2017/05/se-radio-episode-290-diogo-monica-on-docker-security/) this project briefly with its creator Diogo Mónica, and it sounds like the focus is on creating a better way of running privileged services on swarm, instead of investing time into this.
