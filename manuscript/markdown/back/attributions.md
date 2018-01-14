@@ -48,7 +48,7 @@ and the morning paper
 [https://docs.docker.com/engine/tutorials/dockervolumes/#locating-a-volume](https://docs.docker.com/engine/tutorials/dockervolumes/#locating-a-volume) 
 
 **Further details can be found** at the dockervolumes documentation  
-[https://docs.docker.com/engine/tutorials/dockervolumes/#volume-labels](https://docs.docker.com/engine/tutorials/dockervolumes/#volume-labels)
+[https://docs.docker.com/engine/admin/volumes/volumes/](https://docs.docker.com/engine/admin/volumes/volumes/)
 
 **`PID` namespaces are hierarchically nested** in ancestor-descendant relationships to a depth of up to 32 levels  
 [https://lwn.net/Articles/531419/](https://lwn.net/Articles/531419/) 
@@ -70,13 +70,13 @@ https://github.com/docker/libcontainer/blob/83a102cc68a09d890cce3b6c2e5c14c49e63
 PEC.md
 
 **When a container is created** with `--uts="host"` a UTS namespace is inherited from the host  
-[https://docs.docker.com/engine/reference/run/#uts-settings---uts](https://docs.docker.com/engine/reference/run/#uts-settings---uts)
+[https://docs.docker.com/engine/reference/run/#uts-settings-uts](https://docs.docker.com/engine/reference/run/#uts-settings-uts)
 
 **According to the namespaces man page** "_Objects created in an IPC namespace are visible to all other processes that are members of that namespace, but are not visible to processes in other IPC namespaces._"  
 [http://man7.org/linux/man-pages/man7/namespaces.7.html](http://man7.org/linux/man-pages/man7/namespaces.7.html)
 
 **This behaviour can be overridden** to allow a (any) container to reuse another containers or the hosts message queues, semaphores, and shared memory via their IPC namespace  
-[https://docs.docker.com/engine/reference/run/#ipc-settings---ipc](https://docs.docker.com/engine/reference/run/#ipc-settings---ipc)
+[https://docs.docker.com/engine/reference/run/#ipc-settings-ipc](https://docs.docker.com/engine/reference/run/#ipc-settings-ipc)
 
 **You can see using the command** supplied from the CIS_Docker_1.13.0_Benchmark  
 [https://benchmarks.cisecurity.org/tools2/docker/CIS_Docker_1.13.0_Benchmark_v1.0.0.pdf](https://benchmarks.cisecurity.org/tools2/docker/CIS_Docker_1.13.0_Benchmark_v1.0.0.pdf)
@@ -233,7 +233,8 @@ it-and-vulnerability-assessment/
 [https://docs.docker.com/engine/security/userns-remap/](https://docs.docker.com/engine/security/userns-remap/)
 
 **Check out the Docker engine reference**  
-Updated URL: https://github.com/jquast/docker/blob/2fd674a00f98469caa1ceb572e5ae92a68b52f44/docs/reference/commandline/dockerd.md#detailed-information-on-subuidsubgid-ranges
+Updated URL: https://github.com/jquast/docker/blob/2fd674a00f98469caa1ceb572e5ae92a68b  
+52f44/docs/reference/commandline/dockerd.md#detailed-information-on-subuidsubgid-ranges
 
 **Check the Runtime constraints on resources**  
 [https://docs.docker.com/engine/reference/run/#runtime-constraints-on-resources](https://docs.docker.com/engine/reference/run/#runtime-constraints-on-resources)
@@ -340,7 +341,7 @@ c7d4b
 ## Application Security
 
 **The most common attack vectors** are still attacks focussing on our weakest areas, such as people, password stealing, spear phishing, uploading and execution of web shells, compromising social media accounts, weaponised documents, and ultimately application security, as I have mentioned many times before  
-[https://blog.binarymist.net/presentations-publications/#nzjs-2017-the-art-of-exploitation](https://blog.binarymist.net/presentations-publications/#nzjs-2017-the-art-of-exploitation)
+[https://binarymist.io/talk/js-remote-conf-2017-the-art-of-exploitation/](https://binarymist.io/talk/js-remote-conf-2017-the-art-of-exploitation/)
 
 **It is pretty clear** that there are far more vulnerabilities affecting VMs than there are affecting containers  
 [https://xenbits.xen.org/xsa/](https://xenbits.xen.org/xsa/)  
