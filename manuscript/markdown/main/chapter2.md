@@ -141,7 +141,7 @@ Docker leverages the Linux (kernel) namespaces which provide an isolated workspa
     
     Also keep in mind that, by default, the user in the container, unless otherwise specified, is root, the same root user as on the host system.
     
-    {#vps-identify-risks-docker-docker-host-engine-and-containers-namespaces-mnt-labelling}
+    {#docker-host-engine-and-containers-namespaces-mnt-labelling}
     Labelling systems such as [Linux Security Modules (LSM)](#docker-host-engine-and-containers-linux-security-modules) require that the contents of a volume mounted into a container be [labelled](https://docs.docker.com/engine/admin/volumes/volumes/#create-and-manage-volumes). This can be done by adding the `z` (as seen in above example) or `Z` suffix to the volume mount. The `z` suffix instructs Docker to share the mounted volume with other containers, and in so doing, Docker applies a shared content label. Alternatively, if you provide the `Z` suffix, Docker applies a private unshared label, which means only the current container can use the mounted volume. Further details can be found at the [dockervolumes documentation](https://docs.docker.com/engine/admin/volumes/volumes/). This is something to keep in mind if you are using LSM, and have a process inside your container that is unable to use the mounted data.  
     `--volumes-from` allows you to specify a data volume from another container.
     
@@ -806,7 +806,7 @@ Docker has [disabled about 44 system calls](https://docs.docker.com/engine/secur
 
 If you are looking to attack the Linux kernel via its APIs from a Docker container, you still have plenty of surface area here to play with.
 
-## Seccomp (Countermeasures) {#docker-hardening-docker-host-engine-and-containers-seccomp-countermeasures}
+## SecComp (Countermeasures) {#docker-hardening-docker-host-engine-and-containers-seccomp-countermeasures}
 
 First, you need to make sure your Docker instance was built with Seccomp. Using the recommended command from the CIS Docker Benchmark:
 
@@ -828,3 +828,25 @@ To add system calls to the list of syscalls you want to block for your container
 
 {linenos=off, lang=Bash}
     docker run --rm -it --security-opt seccomp=/path/to/seccomp/profile.json hello-world
+
+## Read-only Containers
+
+In order to set up read-only hosts, physical or virtual, there is a lot of work to be done, and in some cases, it becomes challenging to stop an Operating System writing to some files. I discussed this in depth in the subsections "Partitioning on OS Installation" and "Lock Down the
+Mounting of Partitions" in the VPS chapter of my book: Fascicle 1 of [Holistic Info-Sec for Web Developers](https://f1.holisticinfosecforwebdevelopers.com/) In contrast, running Docker containers as read-only is trivial.
+
+Running a container with the `--read-only` flag stops writes to the container.
+
+This can sometimes be a little to constraining, as your application may need to write some temporary data locally. You could volume mount a host directory into your container, but this would obviously expose that temporary data to the host, and also other containers that may mount the same host directory. To stop other containers sharing your mounted volume, you would have to employ [labeling](#docker-host-engine-and-containers-namespaces-mnt-labelling) with the likes of LSM and apply the `Z` suffix at volume mount time.
+
+A better, easier and simpler solution would be to apply the [`--tmpfs`](https://docs.docker.com/engine/reference/commandline/run/#mount-tmpfs-tmpfs) flag to one or more directories. `--tmpfs` allows the creation of tmpfs (appearing as a mounted file system, but stored in volatile memory) mounts on any local directory, which solves the problem of not being able to write to read-only containers.
+
+If an existing directory is specified with the `--tmpfs` option, you will experience similar behaviour to that of mounting an empty directory onto an existing one. The directory is initially empty, any additions or modifications to the directories contents will not persist past container stop.
+
+The following is an example of running a container as read-only with a writeable tmpfs `/tmp` directory:
+
+{linenos=off, lang=Bash}
+    docker run -it --rm --read-only --tmpfs /tmp --name=my-read-only-container ubuntu
+
+The default mount flags with `--tmpfs` are the same as the Linux default `mount` flags, if you do not specify any `mount` flags the following will be used:  
+`rw,noexec,nosuid,nodev,size=65536k`
+
