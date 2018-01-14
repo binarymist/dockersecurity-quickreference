@@ -20,10 +20,12 @@ and the morning paper
 **The Docker overview** says: “_Docker provides the ability to package and run an application in a loosely isolated environment_”  
 [https://docs.docker.com/engine/docker-overview/](https://docs.docker.com/engine/docker-overview/)
 
+**Cisecurity has an excellent resource** for hardening docker images which the Docker Security team helped with  
+[https://benchmarks.cisecurity.org/tools2/docker/CIS_Docker_1.13.0_Benchmark_v1.0.0.pdf](https://benchmarks.cisecurity.org/tools2/docker/CIS_Docker_1.13.0_Benchmark_v1.0.0.pdf)
 
 %% Identify Risks Docker
 
-
+## Habitat - Risks
 
 **The Docker Registry project** is an open-source server side application that lets you store and distribute Docker images  
 [https://github.com/docker/distribution](https://github.com/docker/distribution)
@@ -33,6 +35,8 @@ and the morning paper
 
 **All before any security is added on top** in the form of LXC, or libcontainer (now opencontainers/runc)  
 [https://github.com/opencontainers/runc](https://github.com/opencontainers/runc)
+
+## Hardening Docker Host, Engine and Containers - Risks
 
 **The first place to read for solid background** on Linux kernel namespaces is the man-page  
 [http://man7.org/linux/man-pages/man7/namespaces.7.html](http://man7.org/linux/man-pages/man7/namespaces.7.html)
@@ -50,7 +54,7 @@ and the morning paper
 [https://lwn.net/Articles/531419/](https://lwn.net/Articles/531419/) 
 
 **The default behaviour can however be overridden** to allow a container to be able to access processes within a sibling container, or the hosts `PID` namespace  
-[https://docs.docker.com/engine/reference/run/#pid-settings---pid](https://docs.docker.com/engine/reference/run/#pid-settings---pid)
+[https://docs.docker.com/engine/reference/run/#pid-settings-pid](https://docs.docker.com/engine/reference/run/#pid-settings-pid)
 
 **As an aside, `PID` namespaces give us the functionality** of "_suspending/resuming the set of processes in the container and migrating the container to a new host while the processes inside the container maintain the same PIDs._"  
 [http://man7.org/linux/man-pages/man7/pid_namespaces.7.html](http://man7.org/linux/man-pages/man7/pid_namespaces.7.html)  
@@ -127,14 +131,13 @@ d3cdb5f87c052968554
 %% End Identify Risks Docker
 
 
-
+## Hardening Docker Host, Engine and Containers - Countermeasures
 
 
 
 %% Countermeasures Docker
 
-**Cisecurity has an excellent resource** for hardening docker images which the Docker Security team helped with  
-[https://benchmarks.cisecurity.org/tools2/docker/CIS_Docker_1.13.0_Benchmark_v1.0.0.pdf](https://benchmarks.cisecurity.org/tools2/docker/CIS_Docker_1.13.0_Benchmark_v1.0.0.pdf)
+
 
 **"_Docker Security Scanning_** _is available as an add-on to Docker hosted private repositories on both Docker Cloud and Docker Hub._", you also have to opt in and pay for it  
 https://docs.docker.com/docker-cloud/builds/image-scan  
@@ -310,6 +313,8 @@ Updated URL: https://github.com/jquast/docker/blob/2fd674a00f98469caa1ceb572e5ae
 **Apply the `--tmpfs` flag**  
 [https://docs.docker.com/engine/reference/commandline/run/#mount-tmpfs---tmpfs](https://docs.docker.com/engine/reference/commandline/run/#mount-tmpfs---tmpfs)
 
+## runC and Where it Fits in
+
 **libcontainer**  
 [https://github.com/opencontainers/runc/tree/master/libcontainer](https://github.com/opencontainers/runc/tree/master/libcontainer)
 
@@ -331,6 +336,8 @@ c7d4b
 
 **You must also construct or export a root filesystem**  
 [https://github.com/opencontainers/runc#creating-an-oci-bundle](https://github.com/opencontainers/runc#creating-an-oci-bundle)
+
+## Application Security
 
 **The most common attack vectors** are still attacks focussing on our weakest areas, such as people, password stealing, spear phishing, uploading and execution of web shells, compromising social media accounts, weaponised documents, and ultimately application security, as I have mentioned many times before  
 [https://blog.binarymist.net/presentations-publications/#nzjs-2017-the-art-of-exploitation](https://blog.binarymist.net/presentations-publications/#nzjs-2017-the-art-of-exploitation)
