@@ -14,7 +14,7 @@ The [Seccomp section below](#docker-engine-and-containers-seccomp) discusses Doc
 
 As you can see in the above image, the host kernel is open to receiving potential abuse from containers. Make sure you keep it patched. We will now walk though many areas of potential abuse.
 
-{#vps-countermeasures-docker-hardening-docker-host-engine-and-containers}
+{#hardening-docker-host-engine-and-containers}
 ![](images/ThreatTags/PreventionDIFFICULT.png)
 
 Make sure you keep your host kernel well patched, as it is a huge attack surface, with all of your containers accessing it via System calls.
@@ -52,7 +52,7 @@ It performs a similar job to that of Clair, but does not look as simple. It also
 
 It's designed to integrate into your CI/CD pipeline and integrates with Kubernetes, Docker, Jenkins, CoreOS, Mesos
 
-## [TwistLock](https://www.twistlock.com/) {#vps-countermeasures-docker-hardening-docker-host-engine-and-containers-twistlock}
+## [TwistLock](https://www.twistlock.com/) {#hardening-docker-host-engine-and-containers-twistlock}
 
 TwistLock is a fairly comprehensive and complete proprietary offering with a free developer edition. The following details were taken from TwistLock marketing pages:
 
