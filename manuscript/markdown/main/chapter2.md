@@ -30,3 +30,7 @@ These tools should form a part of your secure and trusted build pipeline, or [so
 ## [Lynis](https://cisofy.com/downloads/)
 
 Lynis is a mature, free and [open source](https://github.com/CISOfy/lynis) auditing tool for Linux/Unix based systems. There is a [Docker plugin](https://cisofy.com/lynis/plugins/docker-containers/) available which allows one to audit Docker, its configuration and containers, but an enterprise license is required, although it is inexpensive.
+
+## [Docker Bench](https://github.com/docker/docker-bench-security)
+
+Docker Bench is a shell script that can be downloaded from GitHub and executed immediately, run from a pre-built container, or using Docker Compose after Git cloning. Docker Bench tests many host configurations and Docker containers against the CIS Docker Benchmark.
