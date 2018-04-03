@@ -6,6 +6,6 @@ One aspect, in-fact, almost certainly the most important regarding Docker securi
 
 I hope this book serves you well in providing the knowledge you will need to harden your Docker deployments.
 
-If you are interested in what I do or would like to review my blog, you can find it at [binarymist.io/blog](https://binarymist.io/blog)
+I blog at [binarymist.io/blog](https://binarymist.io/blog).
 
-If you require any help with improving the security stature of your Development Teams, review the services that I can offer you at [binarymist.io/#services](https://binarymist.io/#services)
+If you require any help with improving the security stature of your Development Teams, review the services that I can offer at [binarymist.io/#services](https://binarymist.io/#services)
