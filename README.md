@@ -1,5 +1,6 @@
 # Docker Security Quick Reference
 ## Homepage: [https://binarymist.io/publication/docker-security/](https://binarymist.io/publication/docker-security/)
+## Blog Post [https://binarymist.io/blog/2018/03/31/docker-security/](https://binarymist.io/blog/2018/03/31/docker-security/)
 
 <br>
 
